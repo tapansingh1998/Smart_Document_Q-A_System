@@ -19,20 +19,102 @@ Build a **PDF-based Question Answering system** that:
 
 ---
 
-## 2. High-Level Architecture
+## 2. Architecture Overview
 
-Standard RAG pipeline:
+### System Flow
 
-1. PDF parsing
-2. Text chunking
-3. Embedding generation
-4. Vector indexing
-5. Hybrid retrieval
-6. Local LLM answer generation
-7. Conversational memory
-8. API layer
+```
+Client
+  ↓
+FastAPI
+  ↓
+PDF Ingestion → Chunking → Embeddings
+  ↓
+Typesense (Vector + Keyword Search)
+  ↓
+Context Builder
+  ↓
+Local LLM (GPT4All)
+  ↓
+Answer
+```
 
-This mirrors real production RAG systems while remaining lightweight.
+This diagram shows the **end-to-end data flow** from request to response. Each stage has a single, well-defined responsibility.
+
+---
+
+## 3. Core Components
+
+### FastAPI
+
+* Exposes `/upload`, `/ask`, `/history`
+* Handles request/response only
+* Keeps business logic separate from API layer
+
+---
+
+### PDF Processing
+
+* Uses `PyPDF2` for stable text extraction on Windows
+* Avoids `pdfminer` / `unstructured` dependency issues
+* Produces raw text from PDFs
+
+---
+
+### Text Chunking
+
+* Manual sliding-window chunking
+* Fixed chunk size with overlap
+* Deterministic, predictable behavior
+* No framework abstraction or hidden logic
+
+---
+
+### Embeddings
+
+* Model: `all-MiniLM-L6-v2`
+* CPU-friendly, fast
+* 384-dimensional vectors
+* Converts text chunks into embeddings
+
+---
+
+### Vector Store (Typesense)
+
+* Stores text + embeddings
+* Supports:
+
+  * Vector search (semantic)
+  * Keyword search (lexical)
+* Local, lightweight, no JVM dependency
+
+---
+
+### Retrieval (Hybrid)
+
+* Combines:
+
+  * Vector similarity results
+  * Keyword matching results
+* Improves recall over single-method retrieval
+* Mimics production-grade RAG retrieval
+
+---
+
+### LLM Layer
+
+* Model: GPT4All (small, CPU-only)
+* No API keys or cloud dependency
+* Runs fully locally
+* Used only for reasoning over retrieved context
+
+---
+
+### Memory
+
+* Simple in-memory dictionary per user
+* Stores conversation history
+* No LangChain dependency
 
 ---
 
